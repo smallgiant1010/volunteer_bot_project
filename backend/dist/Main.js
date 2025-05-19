@@ -41,11 +41,17 @@ const dotenv = __importStar(require("dotenv"));
 const morgan_1 = __importDefault(require("morgan"));
 const Router_1 = __importDefault(require("./routes/Router"));
 const sessionMiddleware_1 = __importDefault(require("./middleware/sessionMiddleware"));
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
 dotenv.config();
 // create app
 const app = (0, express_1.default)();
 // middleware
 app.use((0, morgan_1.default)('dev'));
 app.use(express_1.default.json());
+app.use((0, cookie_parser_1.default)());
+// port
+app.listen(4000, () => {
+    console.log("App Is Running On Port 4000");
+});
 // routes
 app.use("/api/v1", sessionMiddleware_1.default, Router_1.default);
