@@ -49,9 +49,10 @@ const app = (0, express_1.default)();
 app.use((0, morgan_1.default)('dev'));
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
+app.use(sessionMiddleware_1.default);
 // port
 app.listen(4000, () => {
     console.log("App Is Running On Port 4000");
 });
 // routes
-app.use("/api/v1", sessionMiddleware_1.default, Router_1.default);
+app.use("/api/v1", Router_1.default);

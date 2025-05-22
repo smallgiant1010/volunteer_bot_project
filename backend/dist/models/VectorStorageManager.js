@@ -46,7 +46,7 @@ exports.VectorStorageManager = void 0;
 const cheerio_1 = require("@langchain/community/document_loaders/web/cheerio");
 const ollama_1 = require("@langchain/ollama");
 const redis_1 = require("@langchain/redis");
-const cheerio_2 = require("cheerio");
+// import { load } from "cheerio";
 const text_splitter_1 = require("langchain/text_splitter");
 const redis_2 = require("redis");
 const LLMs_1 = require("./constants/LLMs");
@@ -83,42 +83,50 @@ class VectorStorageManager {
     refreshInformationInVectorStore() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.client.flushDb();
-            const blogLinks = yield this.blogLoader();
-            const links = [...blogLinks, ...Links_1.relevant_links];
+            // const blogLinks = await this.blogLoader();
+            // const links: { url: string, label: string }[] = [...blogLinks, ...relevant_links];
             const splitter = new text_splitter_1.RecursiveCharacterTextSplitter({
                 chunkSize: 500,
                 chunkOverlap: 30,
             });
-            const fullData = yield Promise.all(links.map((link) => __awaiter(this, void 0, void 0, function* () {
+            const validLinks = Links_1.relevant_links.filter(link => link.url.includes('www.bridgestoscience.org') && !link.url.includes(".pdf"));
+            const fullData = yield Promise.all(validLinks.map((link) => __awaiter(this, void 0, void 0, function* () {
                 const loader = new cheerio_1.CheerioWebBaseLoader(link.url);
                 const docs = yield loader.load();
                 return docs.map((doc) => (Object.assign(Object.assign({}, doc), { metadata: Object.assign(Object.assign({}, doc.metadata), { url: link.url, label: link.label }) })));
             })));
+            fullData.push(Links_1.relevant_links.map((link) => {
+                return {
+                    metadata: {
+                        url: link.url,
+                        label: link.label,
+                    },
+                    pageContent: `${link.label} - ${link.url}`,
+                };
+            }));
             const allDocsWithMetadata = fullData.flat();
             const splitDocs = yield Promise.all(allDocsWithMetadata.map(data => splitter.splitDocuments([data])));
             const flattenedSplitDocs = splitDocs.flat();
             yield this.vector_store.addDocuments(flattenedSplitDocs);
         });
     }
-    blogLoader() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const loader = new cheerio_1.CheerioWebBaseLoader("https://www.bridgestoscience.org/blog/");
-            const docs = yield loader.load();
-            const links = [];
-            const $ = (0, cheerio_2.load)(docs[0].pageContent);
-            $("a").each((_, el) => {
-                const href = $(el).attr("href");
-                const innerText = $(el).text();
-                if (href.includes("bridgestoscience.org")) {
-                    links.push({
-                        url: href,
-                        label: innerText,
-                    });
-                }
-            });
-            return links;
-        });
-    }
+    // private async blogLoader() {
+    //     const loader: CheerioWebBaseLoader = new CheerioWebBaseLoader("https://www.bridgestoscience.org/blog/");
+    //     const docs = await loader.load();
+    //     const links: { url: string, label: string }[] = [];
+    //     const $ = load(docs[0].pageContent);
+    //     $("a").each((_, el) => {
+    //         const href = $(el).attr("href") as string;
+    //         const innerText = $(el).text() as string;
+    //         if (href.includes("bridgestoscience.org")) {
+    //             links.push({
+    //                 url: href,
+    //                 label: innerText,
+    //             });
+    //         }
+    //     });
+    //     return links;
+    // }
     getVectorStore() {
         return this.vector_store;
     }

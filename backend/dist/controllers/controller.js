@@ -11,10 +11,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendMessage = exports.getSessionMessages = exports.headPopulateData = void 0;
 const ChatBot_1 = require("../models/ChatBot");
-const headPopulateData = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const chat_bot_session_id = req.cookies.chat_bot_session_id;
+const sessionCache = new Map();
+function getOrCreateChatBot(sessionId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!sessionCache.has(sessionId)) {
+            const bot = yield ChatBot_1.ChatBot.create(sessionId, true);
+            sessionCache.set(sessionId, bot);
+        }
+        return sessionCache.get(sessionId);
+    });
+}
+const headPopulateData = (_, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const chatbot = yield ChatBot_1.ChatBot.create(chat_bot_session_id, true);
+        const chatbot = yield getOrCreateChatBot("temporaryStringForUptimeRobot");
         yield chatbot.getVSManager().refreshInformationInVectorStore();
         res.status(200).json(null);
     }
@@ -27,7 +36,8 @@ exports.headPopulateData = headPopulateData;
 const getSessionMessages = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const chat_bot_session_id = req.cookies.chat_bot_session_id;
     try {
-        const chatBot = yield ChatBot_1.ChatBot.create(chat_bot_session_id, true);
+        console.log(chat_bot_session_id);
+        const chatBot = yield getOrCreateChatBot(chat_bot_session_id);
         const history = yield chatBot.getChatHistory();
         res.status(200).json(history);
     }
@@ -43,8 +53,9 @@ const sendMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     const chat_bot_session_id = req.cookies.chat_bot_session_id;
     const { message } = req.body;
     try {
-        const chatbot = yield ChatBot_1.ChatBot.create(chat_bot_session_id, true);
-        const response = yield chatbot.sendMessage(message);
+        console.log(chat_bot_session_id);
+        const chatBot = yield getOrCreateChatBot(chat_bot_session_id);
+        const response = yield chatBot.sendMessage(message);
         res.status(200).json({
             type: "ai",
             content: response,

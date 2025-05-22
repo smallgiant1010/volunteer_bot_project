@@ -82,7 +82,7 @@ class ChatBot {
             bot.agentExecutor = new agents_1.AgentExecutor({
                 agent,
                 tools,
-                memory: bot.memory.getBufferMemory(),
+                memory: bot.memory.getBufferMemory()
             });
             return bot;
         });
@@ -101,6 +101,9 @@ class ChatBot {
                 input: message,
             });
             console.log("Agent output:", output);
+            if (typeof output === "object" && output.query) {
+                return output.query;
+            }
             return output;
         });
     }

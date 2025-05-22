@@ -1,7 +1,7 @@
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import { RedisVectorStore } from "@langchain/redis";
-import { load } from "cheerio";
+// import { load } from "cheerio";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { createClient, RedisClientType } from "redis";
 import { LLMS } from "./constants/LLMs";
@@ -45,15 +45,19 @@ export class VectorStorageManager {
 
     async refreshInformationInVectorStore() {
         await this.client.flushDb();
-        const blogLinks = await this.blogLoader();
-        const links: { url: string, label: string }[] = [...blogLinks, ...relevant_links];
+        // const blogLinks = await this.blogLoader();
+        // const links: { url: string, label: string }[] = [...blogLinks, ...relevant_links];
 
         const splitter = new RecursiveCharacterTextSplitter({
             chunkSize: 500,
             chunkOverlap: 30,
         });
 
-        const fullData = await Promise.all(links.map(async (link) => {
+        const validLinks:{ url: string, label: string }[] = relevant_links.filter(link =>
+            link.url.includes('www.bridgestoscience.org') && !link.url.includes(".pdf")
+        );
+
+        const fullData = await Promise.all(validLinks.map(async (link) => {
             const loader = new CheerioWebBaseLoader(link.url);
             const docs = await loader.load();
 
@@ -67,6 +71,16 @@ export class VectorStorageManager {
             }));
         }));
 
+        fullData.push(relevant_links.map((link) => {
+            return {
+                metadata: {
+                    url: link.url,
+                    label: link.label,
+                },
+                pageContent: `${link.label} - ${link.url}`,
+            }
+        }))
+
         const allDocsWithMetadata = fullData.flat();
 
         const splitDocs = await Promise.all(allDocsWithMetadata.map(data => splitter.splitDocuments([data])));
@@ -76,26 +90,26 @@ export class VectorStorageManager {
         await this.vector_store.addDocuments(flattenedSplitDocs);
     }
 
-    private async blogLoader() {
-        const loader: CheerioWebBaseLoader = new CheerioWebBaseLoader("https://www.bridgestoscience.org/blog/");
-        const docs = await loader.load();
+    // private async blogLoader() {
+    //     const loader: CheerioWebBaseLoader = new CheerioWebBaseLoader("https://www.bridgestoscience.org/blog/");
+    //     const docs = await loader.load();
 
-        const links: { url: string, label: string }[] = [];
-        const $ = load(docs[0].pageContent);
+    //     const links: { url: string, label: string }[] = [];
+    //     const $ = load(docs[0].pageContent);
         
-        $("a").each((_, el) => {
-            const href = $(el).attr("href") as string;
-            const innerText = $(el).text() as string;
-            if (href.includes("bridgestoscience.org")) {
-                links.push({
-                    url: href,
-                    label: innerText,
-                });
-            }
-        });
+    //     $("a").each((_, el) => {
+    //         const href = $(el).attr("href") as string;
+    //         const innerText = $(el).text() as string;
+    //         if (href.includes("bridgestoscience.org")) {
+    //             links.push({
+    //                 url: href,
+    //                 label: innerText,
+    //             });
+    //         }
+    //     });
 
-        return links;
-    }
+    //     return links;
+    // }
 
     getVectorStore(): RedisVectorStore {
         return this.vector_store;

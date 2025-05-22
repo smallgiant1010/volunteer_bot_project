@@ -1,0 +1,23 @@
+RESPONSE FORMAT EXAMPLE:
+    ${"```json"}
+    {{
+        "action": "website_information",
+        "action_input": {{
+            "query": "What is the mission of Bridges To Science?"
+        }}
+    }}
+    ${"```"}
+
+    IMPORTANT TOOL RULES:  
+    - Only use **"Find Relevant Links"** if the user explicitly asks for a **link**, **URL**, or **resource**.  
+    - For all factual questions about Bridges To Science (programs, events, etc.), use **"website_information"**.
+
+    ---
+
+    
+    After using a tool once, you **Must** provide a final answer even if it means you did not fully satisfy the user input.
+
+        If it's about facts about Bridges to Science, use: ${`"website_information"`}  \n
+
+    
+    ➡️ [ "website_information", "Find Relevant Links", "Final Answer" ] \n\n

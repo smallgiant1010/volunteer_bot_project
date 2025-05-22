@@ -1,5 +1,5 @@
 export enum LLMS {
-    chat_model = "PetrosStav/gemma3-tools:12b",
+    chat_model = "mistral",
     embedding_model = "bge-large:latest",
     timeout = 3600,
 }
