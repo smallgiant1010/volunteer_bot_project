@@ -1,7 +1,7 @@
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import { RedisVectorStore } from "@langchain/redis";
-// import { load } from "cheerio";
+import { load } from "cheerio";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { createClient, RedisClientType } from "redis";
 import { LLMS } from "./constants/LLMs";
@@ -57,7 +57,7 @@ export class VectorStorageManager {
             link.url.includes('www.bridgestoscience.org') && !link.url.includes(".pdf")
         );
 
-        const fullData = await Promise.all(validLinks.map(async (link) => {
+        const pageData = await Promise.all(validLinks.map(async (link) => {
             const loader = new CheerioWebBaseLoader(link.url);
             const docs = await loader.load();
 
@@ -70,8 +70,31 @@ export class VectorStorageManager {
                 },
             }));
         }));
+        
+        const moreLinks = await Promise.all(relevant_links.map(async (link) => {
+            if(validLinks.includes(link)) {
+                const response = await fetch(link.url);
+                const html = await response.text();
+                const $ = load(html);
 
-        fullData.push(relevant_links.map((link) => {
+                const associatedLinks: string[] = [];
+
+                $("a").each((_, element) => {
+                    const href = $(element).attr("href");
+                    const innerText = $(element).text();
+                    if(href) {
+                        associatedLinks.push(`${innerText ?? ""} - ${href}`);
+                    }
+                });
+
+                return {
+                    metadata: {
+                        url: link.url,
+                        label: link.label,
+                    },
+                    pageContent: `External Sources of ${link.label} Link: ${associatedLinks.join("\n")}`,
+                }
+            }
             return {
                 metadata: {
                     url: link.url,
@@ -79,7 +102,9 @@ export class VectorStorageManager {
                 },
                 pageContent: `${link.label} - ${link.url}`,
             }
-        }))
+        }));
+
+        const fullData = pageData.concat(moreLinks);
 
         const allDocsWithMetadata = fullData.flat();
 

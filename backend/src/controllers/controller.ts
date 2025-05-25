@@ -24,7 +24,7 @@ const headPopulateData = async (_: Request, res: Response) => {
 }
 
 const getSessionMessages = async (req : Request, res: Response) => {
-    const chat_bot_session_id = req.cookies.chat_bot_session_id;
+    const chat_bot_session_id = req.chat_bot_session_id;
     try {
         console.log(chat_bot_session_id);
         const chatBot: ChatBot = await getOrCreateChatBot(chat_bot_session_id);
@@ -40,7 +40,7 @@ const getSessionMessages = async (req : Request, res: Response) => {
 }
 
 const sendMessage = async (req: Request, res: Response) => {
-    const chat_bot_session_id = req.cookies.chat_bot_session_id;
+    const chat_bot_session_id = req.chat_bot_session_id;
     const { message } = req.body;
     try {
         console.log(chat_bot_session_id);

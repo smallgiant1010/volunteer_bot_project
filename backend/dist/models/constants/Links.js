@@ -33,5 +33,6 @@ exports.relevant_links = [
     { url: "https://tyan.tamu.edu/portfolio-items/bridges-to-science/", label: "Texas Youth Action Network Feature" },
     { url: "https://canaryacademyonline.org/", label: "Canary Academy Online" },
     { url: "https://www.autmhq.org/post-1/autmhq-is-building-new-bridges-with-bridges-to-science", label: "AUTMHQ Partnership Article" },
-    { url: "https://twitter.com/kennedydee/status/1542073237785530369?s=21&t=UHyQqnvvEI0gl8f5rA9_Pw", label: "Twitter Mention by Kennedy Dee" }
+    { url: "https://twitter.com/kennedydee/status/1542073237785530369?s=21&t=UHyQqnvvEI0gl8f5rA9_Pw", label: "Twitter Mention by Kennedy Dee" },
+    { url: "https://docs.google.com/spreadsheets/d/1E-HjVbBDr0K3kdBOPsa782ZWLzQnK8WovifXLHLY9JY/edit?gid=0#gid=0", label: "Bridges to Science Onboarding Volunteer Checklist" },
 ];

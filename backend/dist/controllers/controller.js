@@ -34,7 +34,7 @@ const headPopulateData = (_, res) => __awaiter(void 0, void 0, void 0, function*
 });
 exports.headPopulateData = headPopulateData;
 const getSessionMessages = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const chat_bot_session_id = req.cookies.chat_bot_session_id;
+    const chat_bot_session_id = req.chat_bot_session_id;
     try {
         console.log(chat_bot_session_id);
         const chatBot = yield getOrCreateChatBot(chat_bot_session_id);
@@ -50,7 +50,7 @@ const getSessionMessages = (req, res) => __awaiter(void 0, void 0, void 0, funct
 });
 exports.getSessionMessages = getSessionMessages;
 const sendMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const chat_bot_session_id = req.cookies.chat_bot_session_id;
+    const chat_bot_session_id = req.chat_bot_session_id;
     const { message } = req.body;
     try {
         console.log(chat_bot_session_id);

@@ -2,8 +2,9 @@ import express from "express";
 import * as dotenv from "dotenv";
 import morgan from "morgan";
 import router from "./routes/Router";
-import cookieMiddleware from "./middleware/sessionMiddleware";
+import establishSessionCookies from "./middleware/sessionMiddleware";
 import cookieParser from "cookie-parser";
+// import "./types";
 
 dotenv.config();
 
@@ -14,13 +15,14 @@ const app = express();
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(cookieParser());
-app.use(cookieMiddleware);
+app.use(establishSessionCookies);
+
+// routes
+app.use("/api/v1", router);
 
 // port
 app.listen(4000, () => {
     console.log("App Is Running On Port 4000");
-})
+});
 
-// routes
-app.use("/api/v1", router);
 

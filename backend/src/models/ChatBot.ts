@@ -68,10 +68,9 @@ export class ChatBot {
             input: message,
         });
         console.log("Agent output:", output);
-        
         if (typeof output === "object" && output.query) {
             return output.query;
-        }
+        } 
         return output;
     }
 
