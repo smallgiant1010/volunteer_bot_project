@@ -1,5 +1,5 @@
 import express from "express";
-import { getSessionMessages, headPopulateData, sendMessage } from "../controllers/controller";
+import { getSessionMessages, headPopulateData, killBot, sendMessage } from "../controllers/controller";
 
 const router = express.Router();
 
@@ -9,6 +9,9 @@ router.head("/", headPopulateData);
 router.get("/retrieveChatMessages", getSessionMessages);
 
 router.post("/sendMessageToLLM", sendMessage);
+
+// technically delete 
+router.post("/sendKillBot", killBot)
 
 export default router;
 

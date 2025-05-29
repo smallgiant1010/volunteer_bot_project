@@ -49,8 +49,8 @@ export class VectorStorageManager {
         // const links: { url: string, label: string }[] = [...blogLinks, ...relevant_links];
 
         const splitter = new RecursiveCharacterTextSplitter({
-            chunkSize: 500,
-            chunkOverlap: 30,
+            chunkSize: 1000,
+            chunkOverlap: 100,
         });
 
         const validLinks:{ url: string, label: string }[] = relevant_links.filter(link =>
@@ -58,50 +58,69 @@ export class VectorStorageManager {
         );
 
         const pageData = await Promise.all(validLinks.map(async (link) => {
-            const loader = new CheerioWebBaseLoader(link.url);
-            const docs = await loader.load();
+            try {
+                const loader = new CheerioWebBaseLoader(link.url);
+                const docs = await loader.load();
 
-            return docs.map((doc) => ({
-                ...doc,
-                metadata: {
-                    ...doc.metadata,
-                    url: link.url,
-                    label: link.label,
-                },
-            }));
+                return docs.map((doc) => ({
+                    ...doc,
+                    metadata: {
+                        ...doc.metadata,
+                        url: link.url,
+                        label: link.label,
+                    },
+                }));
+            } catch (error) {
+                console.error(`Error loading ${link.url}:`, error);
+                return []; 
+            }
         }));
         
         const moreLinks = await Promise.all(relevant_links.map(async (link) => {
-            if(validLinks.includes(link)) {
-                const response = await fetch(link.url);
-                const html = await response.text();
-                const $ = load(html);
+            try {
+                if (validLinks.includes(link)) {
+                    const response = await fetch(link.url); 
+                    const html = await response.text();
+                    const $ = load(html);
 
-                const associatedLinks: string[] = [];
+                    const associatedLinks: string[] = [];
 
-                $("a").each((_, element) => {
-                    const href = $(element).attr("href");
-                    const innerText = $(element).text();
-                    if(href) {
-                        associatedLinks.push(`${innerText ?? ""} - ${href}`);
-                    }
-                });
+                    $("a").each((_, element) => {
+                        const href = $(element).attr("href");
+                        const innerText = $(element).text();
+                        if (href) {
+                            associatedLinks.push(`${innerText ?? ""} - ${href}`);
+                        }
+                    });
 
+                    return {
+                        metadata: {
+                            url: link.url,
+                            label: link.label,
+                        },
+                        pageContent: `External Sources of ${link.label} Link: ${associatedLinks.join("\n")}`,
+                    };
+                }
                 return {
                     metadata: {
                         url: link.url,
                         label: link.label,
                     },
-                    pageContent: `External Sources of ${link.label} Link: ${associatedLinks.join("\n")}`,
-                }
+                    pageContent: `${link.label} - ${link.url}`,
+                };
+            } catch (error) {
+                console.error(`Error fetching ${link.url}:`, error);
             }
+
+            // fallback content
+            console.log(link);
             return {
                 metadata: {
                     url: link.url,
                     label: link.label,
                 },
                 pageContent: `${link.label} - ${link.url}`,
-            }
+            };
         }));
 
         const fullData = pageData.concat(moreLinks);

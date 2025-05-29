@@ -1,26 +1,28 @@
 import { ChatOllama } from "@langchain/ollama";
-import { createStructuredChatAgent, AgentExecutor } from "langchain/agents";
 import * as dotenv from "dotenv";
 import Instruction from "./constants/Instructions";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { VectorStorageManager } from "./VectorStorageManager";
-import { MemoryManager } from "./MemoryManager";
-import { ToolKit } from "./Toolkit";
 import { LLMS } from "./constants/LLMs";
+import { Runnable } from "@langchain/core/runnables";
+import { createRetrievalChain } from "langchain/chains/retrieval";
+import { createHistoryAwareRetriever } from "langchain/chains/history_aware_retriever";
+import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
 
 dotenv.config();
 
 export class ChatBot {
-    private agentExecutor!: AgentExecutor;
-    private memory: MemoryManager;
+    private chain!: Runnable;
+    private memory: { type: string, content: string }[] = [{
+        type: "ai",
+        content: "Hello, I am VolunteerConnect. How may I help you?"
+    }];
     private vsmanager!: VectorStorageManager;
 
     constructor(
         readonly session_id: string,
         readonly is_being_tested: boolean,
-    ) {
-        this.memory = MemoryManager.create(session_id);
-    }
+    ) {}
 
     static async create(session_id: string, is_being_tested: boolean): Promise<ChatBot> {
         const bot = new ChatBot(session_id, is_being_tested);
@@ -35,20 +37,30 @@ export class ChatBot {
 
         bot.vsmanager = await VectorStorageManager.create(session_id);
 
-        const tools = new ToolKit(bot.vsmanager.getVectorStore()).getTools();
-
-        const agent = await createStructuredChatAgent({
+        const stuffDocumentsChain = await createStuffDocumentsChain({
             llm,
             prompt,
-            tools,
         });
 
-        await bot.memory.getBufferMemory().loadMemoryVariables({});
+        const retriever = bot.getVSManager().getVectorStore().asRetriever({
+            k: 5,
+        });
 
-        bot.agentExecutor = new AgentExecutor({
-            agent,
-            tools,
-            memory: bot.memory.getBufferMemory()
+        const retrieverPrompt = ChatPromptTemplate.fromMessages([
+            new MessagesPlaceholder("chat_history"),
+            ["user", "{input}"],
+            ["user", "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation"],
+        ]);
+
+        const historyAwareRetriever = await createHistoryAwareRetriever({
+            llm,
+            retriever,
+            rephrasePrompt: retrieverPrompt
+        });
+        
+        bot.chain = await createRetrievalChain({
+            retriever: historyAwareRetriever,
+            combineDocsChain: stuffDocumentsChain,
         });
 
         return bot;
@@ -58,27 +70,34 @@ export class ChatBot {
         return new ChatOllama({
             model: LLMS.chat_model as string,
             // baseUrl: "",
-            temperature: 0.3,
+            temperature: 0,
             verbose: is_being_tested
         });
     }
 
     async sendMessage(message: string) {
-        const { output } = await this.agentExecutor.invoke({
+        const { answer } = await this.chain.invoke({
             input: message,
+            chat_history: this.memory,
         });
-        console.log("Agent output:", output);
-        if (typeof output === "object" && output.query) {
-            return output.query;
-        } 
-        return output;
+        this.memory.push({
+            type: "human",
+            content: message,
+        });
+        this.memory.push({
+            type: "ai",
+            content: answer,
+        });
+        console.log("Agent output:", answer);
+        return answer;
     }
 
-    async getChatHistory(): Promise<{ type: string, content: string }[]> {
-        return await this.memory.getChatHistory();
+    getChatHistory(): { type: string, content: string }[] {
+        return this.memory;
     }
 
     getVSManager(): VectorStorageManager {
         return this.vsmanager;
     }
+
 }

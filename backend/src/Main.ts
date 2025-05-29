@@ -4,6 +4,7 @@ import morgan from "morgan";
 import router from "./routes/Router";
 import establishSessionCookies from "./middleware/sessionMiddleware";
 import cookieParser from "cookie-parser";
+import cors from "cors";
 // import "./types";
 
 dotenv.config();
@@ -13,6 +14,10 @@ const app = express();
 
 // middleware
 app.use(morgan('dev'));
+app.use(cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+}));
 app.use(express.json());
 app.use(cookieParser());
 app.use(establishSessionCookies);

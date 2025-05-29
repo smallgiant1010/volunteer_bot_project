@@ -47,20 +47,23 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatBot = void 0;
 const ollama_1 = require("@langchain/ollama");
-const agents_1 = require("langchain/agents");
 const dotenv = __importStar(require("dotenv"));
 const Instructions_1 = __importDefault(require("./constants/Instructions"));
 const prompts_1 = require("@langchain/core/prompts");
 const VectorStorageManager_1 = require("./VectorStorageManager");
-const MemoryManager_1 = require("./MemoryManager");
-const Toolkit_1 = require("./Toolkit");
 const LLMs_1 = require("./constants/LLMs");
+const retrieval_1 = require("langchain/chains/retrieval");
+const history_aware_retriever_1 = require("langchain/chains/history_aware_retriever");
+const combine_documents_1 = require("langchain/chains/combine_documents");
 dotenv.config();
 class ChatBot {
     constructor(session_id, is_being_tested) {
         this.session_id = session_id;
         this.is_being_tested = is_being_tested;
-        this.memory = MemoryManager_1.MemoryManager.create(session_id);
+        this.memory = [{
+                type: "ai",
+                content: "Hello, I am VolunteerConnect. How may I help you?"
+            }];
     }
     static create(session_id, is_being_tested) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -72,17 +75,26 @@ class ChatBot {
                 ["user", "{input}"],
             ]);
             bot.vsmanager = yield VectorStorageManager_1.VectorStorageManager.create(session_id);
-            const tools = new Toolkit_1.ToolKit(bot.vsmanager.getVectorStore()).getTools();
-            const agent = yield (0, agents_1.createStructuredChatAgent)({
+            const stuffDocumentsChain = yield (0, combine_documents_1.createStuffDocumentsChain)({
                 llm,
                 prompt,
-                tools,
             });
-            yield bot.memory.getBufferMemory().loadMemoryVariables({});
-            bot.agentExecutor = new agents_1.AgentExecutor({
-                agent,
-                tools,
-                memory: bot.memory.getBufferMemory()
+            const retriever = bot.getVSManager().getVectorStore().asRetriever({
+                k: 5,
+            });
+            const retrieverPrompt = prompts_1.ChatPromptTemplate.fromMessages([
+                new prompts_1.MessagesPlaceholder("chat_history"),
+                ["user", "{input}"],
+                ["user", "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation"],
+            ]);
+            const historyAwareRetriever = yield (0, history_aware_retriever_1.createHistoryAwareRetriever)({
+                llm,
+                retriever,
+                rephrasePrompt: retrieverPrompt
+            });
+            bot.chain = yield (0, retrieval_1.createRetrievalChain)({
+                retriever: historyAwareRetriever,
+                combineDocsChain: stuffDocumentsChain,
             });
             return bot;
         });
@@ -91,26 +103,30 @@ class ChatBot {
         return new ollama_1.ChatOllama({
             model: LLMs_1.LLMS.chat_model,
             // baseUrl: "",
-            temperature: 0.3,
+            temperature: 0,
             verbose: is_being_tested
         });
     }
     sendMessage(message) {
         return __awaiter(this, void 0, void 0, function* () {
-            const { output } = yield this.agentExecutor.invoke({
+            const { answer } = yield this.chain.invoke({
                 input: message,
+                chat_history: this.memory,
             });
-            console.log("Agent output:", output);
-            if (typeof output === "object" && output.query) {
-                return output.query;
-            }
-            return output;
+            this.memory.push({
+                type: "human",
+                content: message,
+            });
+            this.memory.push({
+                type: "ai",
+                content: answer,
+            });
+            console.log("Agent output:", answer);
+            return answer;
         });
     }
     getChatHistory() {
-        return __awaiter(this, void 0, void 0, function* () {
-            return yield this.memory.getChatHistory();
-        });
+        return this.memory;
     }
     getVSManager() {
         return this.vsmanager;

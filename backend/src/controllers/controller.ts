@@ -28,7 +28,7 @@ const getSessionMessages = async (req : Request, res: Response) => {
     try {
         console.log(chat_bot_session_id);
         const chatBot: ChatBot = await getOrCreateChatBot(chat_bot_session_id);
-        const history = await chatBot.getChatHistory();
+        const history = chatBot.getChatHistory();
         res.status(200).json(history);
     }
     catch(err) {
@@ -59,4 +59,21 @@ const sendMessage = async (req: Request, res: Response) => {
     }
 }
 
-export { headPopulateData, getSessionMessages, sendMessage }
+const killBot = async (req: Request, res: Response) => {
+    const chat_bot_session_id = req.chat_bot_session_id;
+    try {
+        console.log(chat_bot_session_id);
+        sessionCache.delete(chat_bot_session_id);
+        res.status(200).json({
+            message: "Memory Successfully Wiped"
+        })
+    }
+    catch(err) {
+        console.log(err);
+        res.status(500).json({
+            error: err,
+        })
+    }
+}
+
+export { headPopulateData, getSessionMessages, sendMessage, killBot }

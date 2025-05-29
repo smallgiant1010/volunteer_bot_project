@@ -10,4 +10,6 @@ const router = express_1.default.Router();
 router.head("/", controller_1.headPopulateData);
 router.get("/retrieveChatMessages", controller_1.getSessionMessages);
 router.post("/sendMessageToLLM", controller_1.sendMessage);
+// technically delete 
+router.post("/sendKillBot", controller_1.killBot);
 exports.default = router;

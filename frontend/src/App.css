@@ -1,38 +1,92 @@
-.App {
-  text-align: center;
+.messagingBox {
+  width: 15em;
+  height: 45vh;
+  border-radius: 25px;
+  background-color: #ACFCD9;
+  bottom: 50px;
+  right: 75px;
+  transform: scale(0);
+  transform-origin: bottom right;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
+@media (min-width: 1024px) {
+  .messagingBox {
+    width: 20em;
+    height: 60vh;
   }
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+.message {
+  color: #190933;
 }
 
-.App-link {
-  color: #61dafb;
+.aiMessage {
+  align-self: self-start;
+  background-color: #5DD9C1;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.humanMessage {
+  align-self: self-end;
+  background-color: #7D8CC4;
+}
+
+.messagesArea {
+  height: calc(100% - 5em);
+  overflow-y: hidden;
+}
+
+.headingBorder {
+  height: 2.5em;
+  font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  background-color: #B084CC;
+  border-top-left-radius: 25px;
+  border-top-right-radius: 25px;
+  color: #665687;
+  font-weight: 700;
+}
+
+.inputFooter {
+  height: 2.5em;
+  font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  background-color: #B084CC;
+  border-bottom-left-radius: 25px;
+  border-bottom-right-radius: 25px;
+  color: #665687;
+  bottom: 0px;
+}
+
+.messageField {
+  width: 80%;
+}
+
+.messagingBox.active {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.textMessage {
+  font-size: 12px;
+}
+
+#basicButton {
+  background-color: #B084CC;
+  transition: background-color 0.3s;
+}
+
+#basicButton:hover {
+  background-color: #665687;
+}
+
+#robotImage:hover {
+  background-color: transparent;
+}
+
+#button-addon2 {
+  background-color: #190933;
+}
+
+#button-addon2:hover {
+  background-color: #665687;
 }

@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendMessage = exports.getSessionMessages = exports.headPopulateData = void 0;
+exports.killBot = exports.sendMessage = exports.getSessionMessages = exports.headPopulateData = void 0;
 const ChatBot_1 = require("../models/ChatBot");
 const sessionCache = new Map();
 function getOrCreateChatBot(sessionId) {
@@ -38,7 +38,7 @@ const getSessionMessages = (req, res) => __awaiter(void 0, void 0, void 0, funct
     try {
         console.log(chat_bot_session_id);
         const chatBot = yield getOrCreateChatBot(chat_bot_session_id);
-        const history = yield chatBot.getChatHistory();
+        const history = chatBot.getChatHistory();
         res.status(200).json(history);
     }
     catch (err) {
@@ -69,3 +69,20 @@ const sendMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.sendMessage = sendMessage;
+const killBot = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const chat_bot_session_id = req.chat_bot_session_id;
+    try {
+        console.log(chat_bot_session_id);
+        sessionCache.delete(chat_bot_session_id);
+        res.status(200).json({
+            message: "Memory Successfully Wiped"
+        });
+    }
+    catch (err) {
+        console.log(err);
+        res.status(500).json({
+            error: err,
+        });
+    }
+});
+exports.killBot = killBot;

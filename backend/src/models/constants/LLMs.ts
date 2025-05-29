@@ -1,5 +1,5 @@
 export enum LLMS {
-    chat_model = "llama3.2",
+    chat_model = "cogito",
     embedding_model = "bge-large:latest",
     timeout = 3600,
 }

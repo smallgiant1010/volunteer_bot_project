@@ -86,36 +86,56 @@ class VectorStorageManager {
             // const blogLinks = await this.blogLoader();
             // const links: { url: string, label: string }[] = [...blogLinks, ...relevant_links];
             const splitter = new text_splitter_1.RecursiveCharacterTextSplitter({
-                chunkSize: 500,
-                chunkOverlap: 30,
+                chunkSize: 1000,
+                chunkOverlap: 100,
             });
             const validLinks = Links_1.relevant_links.filter(link => link.url.includes('www.bridgestoscience.org') && !link.url.includes(".pdf"));
             const pageData = yield Promise.all(validLinks.map((link) => __awaiter(this, void 0, void 0, function* () {
-                const loader = new cheerio_1.CheerioWebBaseLoader(link.url);
-                const docs = yield loader.load();
-                return docs.map((doc) => (Object.assign(Object.assign({}, doc), { metadata: Object.assign(Object.assign({}, doc.metadata), { url: link.url, label: link.label }) })));
+                try {
+                    const loader = new cheerio_1.CheerioWebBaseLoader(link.url);
+                    const docs = yield loader.load();
+                    return docs.map((doc) => (Object.assign(Object.assign({}, doc), { metadata: Object.assign(Object.assign({}, doc.metadata), { url: link.url, label: link.label }) })));
+                }
+                catch (error) {
+                    console.error(`Error loading ${link.url}:`, error);
+                    return [];
+                }
             })));
             const moreLinks = yield Promise.all(Links_1.relevant_links.map((link) => __awaiter(this, void 0, void 0, function* () {
-                if (validLinks.includes(link)) {
-                    const response = yield fetch(link.url);
-                    const html = yield response.text();
-                    const $ = (0, cheerio_2.load)(html);
-                    const associatedLinks = [];
-                    $("a").each((_, element) => {
-                        const href = $(element).attr("href");
-                        const innerText = $(element).text();
-                        if (href) {
-                            associatedLinks.push(`${innerText !== null && innerText !== void 0 ? innerText : ""} - ${href}`);
-                        }
-                    });
+                try {
+                    if (validLinks.includes(link)) {
+                        const response = yield fetch(link.url);
+                        const html = yield response.text();
+                        const $ = (0, cheerio_2.load)(html);
+                        const associatedLinks = [];
+                        $("a").each((_, element) => {
+                            const href = $(element).attr("href");
+                            const innerText = $(element).text();
+                            if (href) {
+                                associatedLinks.push(`${innerText !== null && innerText !== void 0 ? innerText : ""} - ${href}`);
+                            }
+                        });
+                        return {
+                            metadata: {
+                                url: link.url,
+                                label: link.label,
+                            },
+                            pageContent: `External Sources of ${link.label} Link: ${associatedLinks.join("\n")}`,
+                        };
+                    }
                     return {
                         metadata: {
                             url: link.url,
                             label: link.label,
                         },
-                        pageContent: `External Sources of ${link.label} Link: ${associatedLinks.join("\n")}`,
+                        pageContent: `${link.label} - ${link.url}`,
                     };
                 }
+                catch (error) {
+                    console.error(`Error fetching ${link.url}:`, error);
+                }
+                // fallback content
+                console.log(link);
                 return {
                     metadata: {
                         url: link.url,
