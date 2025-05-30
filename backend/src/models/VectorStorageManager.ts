@@ -49,8 +49,8 @@ export class VectorStorageManager {
         // const links: { url: string, label: string }[] = [...blogLinks, ...relevant_links];
 
         const splitter = new RecursiveCharacterTextSplitter({
-            chunkSize: 1000,
-            chunkOverlap: 100,
+            chunkSize: 500,
+            chunkOverlap: 30,
         });
 
         const validLinks:{ url: string, label: string }[] = relevant_links.filter(link =>

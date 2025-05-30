@@ -7,7 +7,8 @@ const express_1 = __importDefault(require("express"));
 const controller_1 = require("../controllers/controller");
 const router = express_1.default.Router();
 // Methods
-router.head("/", controller_1.headPopulateData);
+router.head("/", controller_1.headUptimeRobot);
+router.head("/refresh", controller_1.headPopulateData);
 router.get("/retrieveChatMessages", controller_1.getSessionMessages);
 router.post("/sendMessageToLLM", controller_1.sendMessage);
 // technically delete 

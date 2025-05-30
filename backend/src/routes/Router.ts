@@ -1,10 +1,12 @@
 import express from "express";
-import { getSessionMessages, headPopulateData, killBot, sendMessage } from "../controllers/controller";
+import { getSessionMessages, headPopulateData, headUptimeRobot, killBot, sendMessage } from "../controllers/controller";
 
 const router = express.Router();
 
 // Methods
-router.head("/", headPopulateData);
+router.head("/", headUptimeRobot);
+
+router.head("/refresh", headPopulateData);
 
 router.get("/retrieveChatMessages", getSessionMessages);
 

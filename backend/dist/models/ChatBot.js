@@ -80,7 +80,7 @@ class ChatBot {
                 prompt,
             });
             const retriever = bot.getVSManager().getVectorStore().asRetriever({
-                k: 5,
+                k: 10,
             });
             const retrieverPrompt = prompts_1.ChatPromptTemplate.fromMessages([
                 new prompts_1.MessagesPlaceholder("chat_history"),
@@ -103,7 +103,7 @@ class ChatBot {
         return new ollama_1.ChatOllama({
             model: LLMs_1.LLMS.chat_model,
             // baseUrl: "",
-            temperature: 0,
+            temperature: 0.3,
             verbose: is_being_tested
         });
     }

@@ -43,7 +43,7 @@ export class ChatBot {
         });
 
         const retriever = bot.getVSManager().getVectorStore().asRetriever({
-            k: 5,
+            k: 10,
         });
 
         const retrieverPrompt = ChatPromptTemplate.fromMessages([
@@ -70,7 +70,7 @@ export class ChatBot {
         return new ChatOllama({
             model: LLMS.chat_model as string,
             // baseUrl: "",
-            temperature: 0,
+            temperature: 0.3,
             verbose: is_being_tested
         });
     }

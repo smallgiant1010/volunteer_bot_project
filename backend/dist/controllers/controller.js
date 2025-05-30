@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.killBot = exports.sendMessage = exports.getSessionMessages = exports.headPopulateData = void 0;
+exports.killBot = exports.sendMessage = exports.getSessionMessages = exports.headPopulateData = exports.headUptimeRobot = void 0;
 const ChatBot_1 = require("../models/ChatBot");
 const sessionCache = new Map();
 function getOrCreateChatBot(sessionId) {
@@ -21,6 +21,10 @@ function getOrCreateChatBot(sessionId) {
         return sessionCache.get(sessionId);
     });
 }
+const headUptimeRobot = (_, res) => {
+    res.status(200).json({ message: "endpoint successfully contacted" });
+};
+exports.headUptimeRobot = headUptimeRobot;
 const headPopulateData = (_, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const chatbot = yield getOrCreateChatBot("temporaryStringForUptimeRobot");

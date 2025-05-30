@@ -86,8 +86,8 @@ class VectorStorageManager {
             // const blogLinks = await this.blogLoader();
             // const links: { url: string, label: string }[] = [...blogLinks, ...relevant_links];
             const splitter = new text_splitter_1.RecursiveCharacterTextSplitter({
-                chunkSize: 1000,
-                chunkOverlap: 100,
+                chunkSize: 500,
+                chunkOverlap: 30,
             });
             const validLinks = Links_1.relevant_links.filter(link => link.url.includes('www.bridgestoscience.org') && !link.url.includes(".pdf"));
             const pageData = yield Promise.all(validLinks.map((link) => __awaiter(this, void 0, void 0, function* () {

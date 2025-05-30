@@ -11,6 +11,10 @@ async function getOrCreateChatBot(sessionId: string): Promise<ChatBot> {
     return sessionCache.get(sessionId)!;
 }
 
+const headUptimeRobot = (_:Request, res: Response) => {
+    res.status(200).json({ message : "endpoint successfully contacted"});
+}
+
 const headPopulateData = async (_: Request, res: Response) => {
     try {
         const chatbot: ChatBot = await getOrCreateChatBot("temporaryStringForUptimeRobot");
@@ -76,4 +80,4 @@ const killBot = async (req: Request, res: Response) => {
     }
 }
 
-export { headPopulateData, getSessionMessages, sendMessage, killBot }
+export { headUptimeRobot, headPopulateData, getSessionMessages, sendMessage, killBot }

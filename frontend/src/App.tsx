@@ -58,9 +58,17 @@ function App() {
   const handleClick = async(e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setIsLoading(_ => true);
+    setMessages(prev => [...prev, {
+      type: "human",
+      content: inputRef.current?.value!,
+    }]);
     try {
       const response = await fetch("http://localhost:4000/api/v1/sendMessageToLLM", {
+        method: "POST",
         credentials: 'include',
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           message: inputRef.current?.value,
         }),
@@ -72,7 +80,14 @@ function App() {
 
       const message: MessageType = await response.json();
 
-      setMessages(prev => [...prev, message])
+      setMessages(prev => {
+        const newMessages = [...prev, message];
+
+        console.log('NEW messages:', newMessages);
+        return newMessages;
+      });
+
+      inputRef.current!.value = "";
     }
     catch(err) {
       console.log(err);
@@ -100,7 +115,7 @@ function App() {
               ref={inputRef}
             />
             <Button id="button-addon2" className="border border-0" onClick={handleClick}>
-              {isLoading ? <Spinner animation="border" /> : "Send"}
+              {isLoading ? <Spinner animation="border" size="sm"/> : "Send"}
             </Button>
           </InputGroup>
         </footer>
