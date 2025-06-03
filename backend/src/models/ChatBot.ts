@@ -1,22 +1,20 @@
 import { ChatOllama } from "@langchain/ollama";
 import * as dotenv from "dotenv";
-import Instruction from "./constants/Instructions";
-import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
+import { Instruction, LLMS } from "../constants/Constants";
+import { ChatPromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate } from "@langchain/core/prompts";
 import { VectorStorageManager } from "./VectorStorageManager";
-import { LLMS } from "./constants/LLMs";
-import { Runnable } from "@langchain/core/runnables";
-import { createRetrievalChain } from "langchain/chains/retrieval";
-import { createHistoryAwareRetriever } from "langchain/chains/history_aware_retriever";
-import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
+import { createStructuredChatAgent, AgentExecutor } from "langchain/agents";
+import { Toolkit } from "./Toolkit";
+import { AIMessage, BaseMessage, HumanMessage } from "@langchain/core/messages";
 
 dotenv.config();
 
 export class ChatBot {
-    private chain!: Runnable;
-    private memory: { type: string, content: string }[] = [{
-        type: "ai",
-        content: "Hello, I am VolunteerConnect. How may I help you?"
-    }];
+    private executor!: AgentExecutor;
+    private memory: BaseMessage[] = [new AIMessage({
+        content: "Hello, I am VolunteerConnect. How may I help you?",
+        additional_kwargs: {},
+    })];
     private vsmanager!: VectorStorageManager;
 
     constructor(
@@ -30,45 +28,35 @@ export class ChatBot {
         const llm = bot.createLLM(is_being_tested);
 
         const prompt = ChatPromptTemplate.fromMessages([
-            ["system", Instruction.objective],
+            SystemMessagePromptTemplate.fromTemplate(Instruction.objective),
             new MessagesPlaceholder("chat_history"),
-            ["user", "{input}"],
+            HumanMessagePromptTemplate.fromTemplate("{input}"),
         ]);
 
-        bot.vsmanager = await VectorStorageManager.create(session_id);
+        bot.vsmanager = new VectorStorageManager();
 
-        const stuffDocumentsChain = await createStuffDocumentsChain({
+        const toolkit = new Toolkit(bot.vsmanager);
+
+        const tools = toolkit.getTools();
+
+        const agent = await createStructuredChatAgent({
             llm,
             prompt,
+            tools,
         });
 
-        const retriever = bot.getVSManager().getVectorStore().asRetriever({
-            k: 10,
-        });
-
-        const retrieverPrompt = ChatPromptTemplate.fromMessages([
-            new MessagesPlaceholder("chat_history"),
-            ["user", "{input}"],
-            ["user", "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation"],
-        ]);
-
-        const historyAwareRetriever = await createHistoryAwareRetriever({
-            llm,
-            retriever,
-            rephrasePrompt: retrieverPrompt
-        });
-        
-        bot.chain = await createRetrievalChain({
-            retriever: historyAwareRetriever,
-            combineDocsChain: stuffDocumentsChain,
-        });
+        bot.executor = new AgentExecutor({
+            agent,
+            tools,
+            returnIntermediateSteps: false,
+        })
 
         return bot;
     }
 
     private createLLM(is_being_tested: boolean): ChatOllama {
         return new ChatOllama({
-            model: LLMS.chat_model as string,
+            model: LLMS.CHAT_MODEL as string,
             // baseUrl: "",
             temperature: 0.3,
             verbose: is_being_tested
@@ -76,24 +64,29 @@ export class ChatBot {
     }
 
     async sendMessage(message: string) {
-        const { answer } = await this.chain.invoke({
+        const { output } = await this.executor.invoke({
             input: message,
             chat_history: this.memory,
         });
-        this.memory.push({
-            type: "human",
+        this.memory.push(new HumanMessage({
             content: message,
-        });
-        this.memory.push({
-            type: "ai",
-            content: answer,
-        });
-        console.log("Agent output:", answer);
-        return answer;
+            additional_kwargs: {},
+        }));
+        this.memory.push(new AIMessage({
+            content: output,
+            additional_kwargs: {},
+        }));
+        console.log("Agent output:", output);
+        return output;
     }
 
     getChatHistory(): { type: string, content: string }[] {
-        return this.memory;
+        return this.memory.map(base => {
+            return {
+                type: base.getType(),
+                content: base.text,
+            };
+        });
     }
 
     getVSManager(): VectorStorageManager {

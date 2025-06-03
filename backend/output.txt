@@ -105,3 +105,6 @@ You are a ChatBot called VolunteerConnect that specializes in retrieving and res
     Thought: {agent_scratchpad}
 
     `
+
+        You have access to only the following tools:
+    Tools: {tools}

@@ -15,18 +15,6 @@ const headUptimeRobot = (_:Request, res: Response) => {
     res.status(200).json({ message : "endpoint successfully contacted"});
 }
 
-const headPopulateData = async (_: Request, res: Response) => {
-    try {
-        const chatbot: ChatBot = await getOrCreateChatBot("temporaryStringForUptimeRobot");
-        await chatbot.getVSManager().refreshInformationInVectorStore();
-        res.status(200).json(null);
-    }
-    catch(err) {
-        console.log(err);
-        res.status(500).json(null);
-    }
-}
-
 const getSessionMessages = async (req : Request, res: Response) => {
     const chat_bot_session_id = req.chat_bot_session_id;
     try {
@@ -80,4 +68,4 @@ const killBot = async (req: Request, res: Response) => {
     }
 }
 
-export { headUptimeRobot, headPopulateData, getSessionMessages, sendMessage, killBot }
+export { headUptimeRobot, getSessionMessages, sendMessage, killBot }

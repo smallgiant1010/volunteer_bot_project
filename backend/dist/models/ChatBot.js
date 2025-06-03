@@ -41,67 +41,54 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatBot = void 0;
 const ollama_1 = require("@langchain/ollama");
 const dotenv = __importStar(require("dotenv"));
-const Instructions_1 = __importDefault(require("./constants/Instructions"));
+const Constants_1 = require("../constants/Constants");
 const prompts_1 = require("@langchain/core/prompts");
 const VectorStorageManager_1 = require("./VectorStorageManager");
-const LLMs_1 = require("./constants/LLMs");
-const retrieval_1 = require("langchain/chains/retrieval");
-const history_aware_retriever_1 = require("langchain/chains/history_aware_retriever");
-const combine_documents_1 = require("langchain/chains/combine_documents");
+const agents_1 = require("langchain/agents");
+const Toolkit_1 = require("./Toolkit");
+const messages_1 = require("@langchain/core/messages");
 dotenv.config();
 class ChatBot {
     constructor(session_id, is_being_tested) {
         this.session_id = session_id;
         this.is_being_tested = is_being_tested;
-        this.memory = [{
-                type: "ai",
-                content: "Hello, I am VolunteerConnect. How may I help you?"
-            }];
+        this.memory = [new messages_1.AIMessage({
+                content: "Hello, I am VolunteerConnect. How may I help you?",
+                additional_kwargs: {},
+            })];
     }
     static create(session_id, is_being_tested) {
         return __awaiter(this, void 0, void 0, function* () {
             const bot = new ChatBot(session_id, is_being_tested);
             const llm = bot.createLLM(is_being_tested);
             const prompt = prompts_1.ChatPromptTemplate.fromMessages([
-                ["system", Instructions_1.default.objective],
+                prompts_1.SystemMessagePromptTemplate.fromTemplate(Constants_1.Instruction.objective),
                 new prompts_1.MessagesPlaceholder("chat_history"),
-                ["user", "{input}"],
+                prompts_1.HumanMessagePromptTemplate.fromTemplate("{input}"),
             ]);
-            bot.vsmanager = yield VectorStorageManager_1.VectorStorageManager.create(session_id);
-            const stuffDocumentsChain = yield (0, combine_documents_1.createStuffDocumentsChain)({
+            bot.vsmanager = new VectorStorageManager_1.VectorStorageManager();
+            const toolkit = new Toolkit_1.Toolkit(bot.vsmanager);
+            const tools = toolkit.getTools();
+            const agent = yield (0, agents_1.createStructuredChatAgent)({
                 llm,
                 prompt,
+                tools,
             });
-            const retriever = bot.getVSManager().getVectorStore().asRetriever({
-                k: 10,
-            });
-            const retrieverPrompt = prompts_1.ChatPromptTemplate.fromMessages([
-                new prompts_1.MessagesPlaceholder("chat_history"),
-                ["user", "{input}"],
-                ["user", "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation"],
-            ]);
-            const historyAwareRetriever = yield (0, history_aware_retriever_1.createHistoryAwareRetriever)({
-                llm,
-                retriever,
-                rephrasePrompt: retrieverPrompt
-            });
-            bot.chain = yield (0, retrieval_1.createRetrievalChain)({
-                retriever: historyAwareRetriever,
-                combineDocsChain: stuffDocumentsChain,
+            bot.executor = new agents_1.AgentExecutor({
+                agent,
+                tools,
+                returnIntermediateSteps: false,
             });
             return bot;
         });
     }
     createLLM(is_being_tested) {
         return new ollama_1.ChatOllama({
-            model: LLMs_1.LLMS.chat_model,
+            model: Constants_1.LLMS.CHAT_MODEL,
             // baseUrl: "",
             temperature: 0.3,
             verbose: is_being_tested
@@ -109,24 +96,29 @@ class ChatBot {
     }
     sendMessage(message) {
         return __awaiter(this, void 0, void 0, function* () {
-            const { answer } = yield this.chain.invoke({
+            const { output } = yield this.executor.invoke({
                 input: message,
                 chat_history: this.memory,
             });
-            this.memory.push({
-                type: "human",
+            this.memory.push(new messages_1.HumanMessage({
                 content: message,
-            });
-            this.memory.push({
-                type: "ai",
-                content: answer,
-            });
-            console.log("Agent output:", answer);
-            return answer;
+                additional_kwargs: {},
+            }));
+            this.memory.push(new messages_1.AIMessage({
+                content: output,
+                additional_kwargs: {},
+            }));
+            console.log("Agent output:", output);
+            return output;
         });
     }
     getChatHistory() {
-        return this.memory;
+        return this.memory.map(base => {
+            return {
+                type: base.getType(),
+                content: base.text,
+            };
+        });
     }
     getVSManager() {
         return this.vsmanager;

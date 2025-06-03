@@ -43,133 +43,185 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VectorStorageManager = void 0;
-const cheerio_1 = require("@langchain/community/document_loaders/web/cheerio");
 const ollama_1 = require("@langchain/ollama");
-const redis_1 = require("@langchain/redis");
-const cheerio_2 = require("cheerio");
+const mongodb_1 = require("@langchain/mongodb");
+const mongodb_2 = require("mongodb");
 const text_splitter_1 = require("langchain/text_splitter");
-const redis_2 = require("redis");
-const LLMs_1 = require("./constants/LLMs");
-const Links_1 = require("./constants/Links");
+const Constants_1 = require("../constants/Constants");
 const dotenv = __importStar(require("dotenv"));
+const uuid_1 = require("uuid");
 dotenv.config();
 class VectorStorageManager {
-    constructor(session_id) {
-        this.session_id = session_id;
+    constructor() {
         this.indexName = "volunteerBot";
-    }
-    static create(session_id) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const vector_store_manager = new VectorStorageManager(session_id);
-            const embeddingsModel = new ollama_1.OllamaEmbeddings({
-                model: LLMs_1.LLMS.embedding_model,
-            });
-            vector_store_manager.client = (0, redis_2.createClient)({
-                username: "default",
-                password: process.env.REDIS_PASSWORD,
-                socket: {
-                    host: process.env.REDIS_URL,
-                    port: 16686,
-                },
-            });
-            yield vector_store_manager.client.connect();
-            vector_store_manager.vector_store = new redis_1.RedisVectorStore(embeddingsModel, {
-                redisClient: vector_store_manager.client,
-                indexName: vector_store_manager.indexName
-            });
-            return vector_store_manager;
+        this.model = new ollama_1.OllamaEmbeddings({
+            model: Constants_1.LLMS.EMBEDDING_MODEL,
+        });
+        this.client = new mongodb_2.MongoClient(process.env.MONGO_URI || "");
+        const collection = this.client
+            .db(process.env.MONGO_DB_NAME)
+            .collection(Constants_1.Collections.EVENTS);
+        this.events_vector_store = new mongodb_1.MongoDBAtlasVectorSearch(this.model, {
+            collection,
+            indexName: this.indexName,
+            textKey: "text",
+            embeddingKey: "embedding",
         });
     }
-    refreshInformationInVectorStore() {
+    addEvent(eventDescription, eventName, eventDate) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this.client.flushDb();
-            // const blogLinks = await this.blogLoader();
-            // const links: { url: string, label: string }[] = [...blogLinks, ...relevant_links];
+            const existing = yield this.events_vector_store.similaritySearch(eventName, 1, {
+                preFilter: {
+                    eventName: {
+                        "$eq": eventName
+                    },
+                    eventDate: {
+                        "$eq": eventDate
+                    }
+                }
+            });
+            if (existing.length > 0) {
+                throw new Error(`Event "${eventName}" on ${eventDate} already exists.`);
+            }
             const splitter = new text_splitter_1.RecursiveCharacterTextSplitter({
                 chunkSize: 500,
-                chunkOverlap: 30,
+                chunkOverlap: 20,
             });
-            const validLinks = Links_1.relevant_links.filter(link => link.url.includes('www.bridgestoscience.org') && !link.url.includes(".pdf"));
-            const pageData = yield Promise.all(validLinks.map((link) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    const loader = new cheerio_1.CheerioWebBaseLoader(link.url);
-                    const docs = yield loader.load();
-                    return docs.map((doc) => (Object.assign(Object.assign({}, doc), { metadata: Object.assign(Object.assign({}, doc.metadata), { url: link.url, label: link.label }) })));
-                }
-                catch (error) {
-                    console.error(`Error loading ${link.url}:`, error);
-                    return [];
-                }
-            })));
-            const moreLinks = yield Promise.all(Links_1.relevant_links.map((link) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    if (validLinks.includes(link)) {
-                        const response = yield fetch(link.url);
-                        const html = yield response.text();
-                        const $ = (0, cheerio_2.load)(html);
-                        const associatedLinks = [];
-                        $("a").each((_, element) => {
-                            const href = $(element).attr("href");
-                            const innerText = $(element).text();
-                            if (href) {
-                                associatedLinks.push(`${innerText !== null && innerText !== void 0 ? innerText : ""} - ${href}`);
-                            }
-                        });
-                        return {
-                            metadata: {
-                                url: link.url,
-                                label: link.label,
-                            },
-                            pageContent: `External Sources of ${link.label} Link: ${associatedLinks.join("\n")}`,
-                        };
-                    }
-                    return {
-                        metadata: {
-                            url: link.url,
-                            label: link.label,
-                        },
-                        pageContent: `${link.label} - ${link.url}`,
-                    };
-                }
-                catch (error) {
-                    console.error(`Error fetching ${link.url}:`, error);
-                }
-                // fallback content
-                console.log(link);
-                return {
-                    metadata: {
-                        url: link.url,
-                        label: link.label,
-                    },
-                    pageContent: `${link.label} - ${link.url}`,
-                };
-            })));
-            const fullData = pageData.concat(moreLinks);
-            const allDocsWithMetadata = fullData.flat();
-            const splitDocs = yield Promise.all(allDocsWithMetadata.map(data => splitter.splitDocuments([data])));
-            const flattenedSplitDocs = splitDocs.flat();
-            yield this.vector_store.addDocuments(flattenedSplitDocs);
+            const chunkedText = yield splitter.splitText(eventDescription);
+            const docs = [];
+            const ids = [];
+            for (let text of chunkedText) {
+                docs.push({
+                    pageContent: text,
+                    metadata: { eventName, eventDate },
+                });
+                ids.push((0, uuid_1.v6)());
+            }
+            yield this.events_vector_store.addDocuments(docs, { ids });
         });
     }
-    // private async blogLoader() {
-    //     const loader: CheerioWebBaseLoader = new CheerioWebBaseLoader("https://www.bridgestoscience.org/blog/");
-    //     const docs = await loader.load();
-    //     const links: { url: string, label: string }[] = [];
-    //     const $ = load(docs[0].pageContent);
-    //     $("a").each((_, el) => {
-    //         const href = $(el).attr("href") as string;
-    //         const innerText = $(el).text() as string;
-    //         if (href.includes("bridgestoscience.org")) {
-    //             links.push({
-    //                 url: href,
-    //                 label: innerText,
-    //             });
-    //         }
-    //     });
-    //     return links;
-    // }
+    cleanupEvent(eventName) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const regex = new RegExp(eventName, "i");
+            const eventsCollection = this.client
+                .db(process.env.MONGO_DB_NAME)
+                .collection(Constants_1.Collections.EVENTS);
+            const existingEventCount = yield eventsCollection.countDocuments({
+                eventName: { $regex: regex },
+            });
+            if (existingEventCount === 0) {
+                console.warn(`No events found for "${eventName}". Cleanup skipped.`);
+                return false;
+            }
+            const eventDocs = yield eventsCollection
+                .find({ eventName: { $regex: regex } })
+                .toArray();
+            const ids = eventDocs.map((event) => event._id.toString());
+            yield this.events_vector_store.delete({ ids });
+            const deleteResultFeedback = yield this.client
+                .db(process.env.MONGO_DB_NAME)
+                .collection(Constants_1.Collections.FEEDBACK)
+                .deleteMany({ eventName: { $regex: regex } });
+            const deleteResultShifts = yield this.client
+                .db(process.env.MONGO_DB_NAME)
+                .collection(Constants_1.Collections.SHIFTS)
+                .deleteMany({ eventName: { $regex: regex } });
+            return deleteResultFeedback.acknowledged && deleteResultShifts.acknowledged;
+        });
+    }
+    storeFeedback(feedback, eventName) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const collection = this.client
+                .db(process.env.MONGO_DB_NAME)
+                .collection(Constants_1.Collections.FEEDBACK);
+            const result = yield collection.insertOne({
+                feedback,
+                eventName,
+            });
+            return result.acknowledged;
+        });
+    }
+    getFeedback(eventName) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const collection = this.client
+                .db(process.env.MONGO_DB_NAME)
+                .collection(Constants_1.Collections.FEEDBACK);
+            const feedback = (yield collection
+                .find({ eventName: { $regex: new RegExp(eventName, "i") } })
+                .toArray()).map((event) => {
+                return {
+                    feedback: event.feedback,
+                };
+            });
+            if (!feedback) {
+                throw new Error(`There is no feedback for ${eventName} currently`);
+            }
+            return feedback;
+        });
+    }
+    addShift(fullName, eventName, shiftLetter) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const collection = this.client
+                .db(process.env.MONGO_DB_NAME)
+                .collection(Constants_1.Collections.SHIFTS);
+            const existing = yield collection.findOne({
+                fullName: { $regex: new RegExp(fullName, "i") },
+                eventName: { $regex: new RegExp(eventName, "i") },
+                shiftLetter: { $regex: new RegExp(shiftLetter, "i") },
+            });
+            if (existing) {
+                throw new Error("A similar shift already exists.");
+            }
+            const result = yield collection.insertOne({
+                fullName,
+                eventName,
+                shiftLetter,
+            });
+            return result.acknowledged;
+        });
+    }
+    cancelShift(fullName, eventName, shiftLetter) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const collection = this.client
+                .db(process.env.MONGO_DB_NAME)
+                .collection(Constants_1.Collections.SHIFTS);
+            const query = {
+                fullName: { $regex: new RegExp(fullName, "i") },
+                eventName: { $regex: new RegExp(eventName, "i") },
+                shiftLetter: { $regex: new RegExp(shiftLetter, "i") },
+            };
+            const existingShift = yield collection.findOne(query);
+            if (!existingShift) {
+                throw new Error(`No matching shift found to cancel for ${fullName}.`);
+            }
+            const result = yield collection.findOneAndDelete(query);
+            return result !== null;
+        });
+    }
+    eventShifts(eventName) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const collection = this.client
+                .db(process.env.MONGO_DB_NAME)
+                .collection(Constants_1.Collections.SHIFTS);
+            const shifts = (yield collection
+                .find({ eventName: { $regex: new RegExp(eventName, "i") } })
+                .toArray()).map((event) => {
+                return {
+                    name: event.fullName,
+                    shiftLetter: event.shiftLetter,
+                };
+            });
+            if (!shifts) {
+                throw new Error(`Nobody signed up for ${eventName}`);
+            }
+            return shifts;
+        });
+    }
     getVectorStore() {
-        return this.vector_store;
+        return this.events_vector_store;
+    }
+    getClient() {
+        return this.client;
     }
 }
 exports.VectorStorageManager = VectorStorageManager;
