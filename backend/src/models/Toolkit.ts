@@ -9,6 +9,7 @@ export class Toolkit {
         private vector_store_manager: VectorStorageManager
     ) {
         this.retrieverToolCreation();
+        this.listingEventsToolCreation();
         this.addingShiftToolCreation();
         this.cancelingShiftToolCreation();
         this.removingEventsToolCreation();
@@ -29,10 +30,30 @@ export class Toolkit {
 
         const retrieverTool = createRetrieverTool(retriever, {
             name: "events_retriever",
-            description: "Use this tool to retrieve information about current volunteering events, including dates, descriptions, and locations.",
+            description: "Use this tool to retrieve information about upcoming or current volunteering events.",
         });
 
         this.tools.push(retrieverTool);
+    }
+
+    private listingEventsToolCreation(): void {
+        const tool = new DynamicStructuredTool({
+            name: "current_and_upcoming_events_lister",
+            description: "Use this tool to retrieve all currently ongoing or upcoming events. This tool will not provide information regarding each event. Strictly use for listing.",
+            schema: z.object({
+                input: z.string().describe("The user query"),
+            }) as unknown as ZodAny,
+            func: async() => {
+                try {
+                    return await this.vector_store_manager.listEvents();
+                } catch(err) {
+                    return err
+                }
+            },
+            returnDirect: true
+        });
+
+        this.tools.push(tool);
     }
 
     private storingEventsToolCreation(): void {

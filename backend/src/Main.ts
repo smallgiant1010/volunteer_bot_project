@@ -26,8 +26,8 @@ app.use(establishSessionCookies);
 app.use("/api/v1", router);
 
 // port
-app.listen(4000, () => {
-    console.log("App Is Running On Port 4000");
+app.listen(process.env.PORT, () => {
+    console.log("App Is Running On Port " + process.env.PORT);
 });
 
 

@@ -35,6 +35,15 @@ export class VectorStorageManager {
     });
   }
 
+  async listEvents(): Promise<string> {
+    const events = await this.client.db(process.env.MONGO_DB_NAME).collection(Collections.EVENTS).find({}).toArray();
+    if(!events || events.length === 0) {
+      return "There are currently no upcoming events.";
+    }
+    const result: string[] = events.map(event => `${event.eventName} on ${event.eventDate}`);
+    return result.join("\n");
+  }
+
   async addEvent(
     eventDescription: string,
     eventName: string,

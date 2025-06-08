@@ -51,6 +51,7 @@ export class ChatBot {
             agent,
             tools,
             returnIntermediateSteps: false,
+            maxIterations: 5,
         })
 
         return bot;
