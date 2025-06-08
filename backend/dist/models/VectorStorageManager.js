@@ -43,7 +43,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VectorStorageManager = void 0;
-const ollama_1 = require("@langchain/ollama");
+// import { OllamaEmbeddings } from "@langchain/ollama";
+// import { MistralAIEmbeddings } from "@langchain/mistralai"
+const google_genai_1 = require("@langchain/google-genai");
 const mongodb_1 = require("@langchain/mongodb");
 const mongodb_2 = require("mongodb");
 const text_splitter_1 = require("langchain/text_splitter");
@@ -53,9 +55,9 @@ const uuid_1 = require("uuid");
 dotenv.config();
 class VectorStorageManager {
     constructor() {
-        this.indexName = "volunteerBot";
-        this.model = new ollama_1.OllamaEmbeddings({
-            model: Constants_1.LLMS.EMBEDDING_MODEL,
+        this.indexName = Constants_1.Indexes.DEV_INDEX;
+        this.model = new google_genai_1.GoogleGenerativeAIEmbeddings({
+            model: Constants_1.LLMS.DEV_EMBEDDING_MODEL,
         });
         this.client = new mongodb_2.MongoClient(process.env.MONGO_URI || "");
         const collection = this.client
@@ -68,9 +70,12 @@ class VectorStorageManager {
             embeddingKey: "embedding",
         });
     }
-    addEvent(eventDescription, eventName, eventDate) {
+    addEvent(eventDescription, eventName, eventDate, secretCode) {
         return __awaiter(this, void 0, void 0, function* () {
-            const existing = yield this.events_vector_store.similaritySearch(eventName, 1, {
+            if (secretCode !== process.env.SECRET_CODE) {
+                return "You do not have the permissions to perform this action.";
+            }
+            const existing = yield this.events_vector_store.similaritySearch(eventDescription, 1, {
                 preFilter: {
                     eventName: {
                         "$eq": eventName
@@ -98,10 +103,14 @@ class VectorStorageManager {
                 ids.push((0, uuid_1.v6)());
             }
             yield this.events_vector_store.addDocuments(docs, { ids });
+            return `${eventName} was successfully registered into the database.`;
         });
     }
-    cleanupEvent(eventName) {
+    cleanupEvent(eventName, secretCode) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (secretCode !== process.env.SECRET_CODE) {
+                return "You do not have the permissions to perform this action.";
+            }
             const regex = new RegExp(eventName, "i");
             const eventsCollection = this.client
                 .db(process.env.MONGO_DB_NAME)
@@ -110,8 +119,7 @@ class VectorStorageManager {
                 eventName: { $regex: regex },
             });
             if (existingEventCount === 0) {
-                console.warn(`No events found for "${eventName}". Cleanup skipped.`);
-                return false;
+                throw new Error(`No events found for "${eventName}". Cleanup skipped.`);
             }
             const eventDocs = yield eventsCollection
                 .find({ eventName: { $regex: regex } })
@@ -126,7 +134,7 @@ class VectorStorageManager {
                 .db(process.env.MONGO_DB_NAME)
                 .collection(Constants_1.Collections.SHIFTS)
                 .deleteMany({ eventName: { $regex: regex } });
-            return deleteResultFeedback.acknowledged && deleteResultShifts.acknowledged;
+            return `${eventName} successfully removed from database, further more: \n${deleteResultFeedback.acknowledged ? `Feedback related to ${eventName} was removed as well.` : `Feedback for ${eventName} could not be removed`}\n${deleteResultShifts.acknowledged ? `Shifts related to ${eventName} were also removed.` : `The Shifts for this event could not be removed`}`;
         });
     }
     storeFeedback(feedback, eventName) {
@@ -138,7 +146,7 @@ class VectorStorageManager {
                 feedback,
                 eventName,
             });
-            return result.acknowledged;
+            return result.acknowledged ? `Feedback for ${eventName} was accepted` : `Feedback for ${eventName} could not be stored`;
         });
     }
     getFeedback(eventName) {
@@ -148,12 +156,8 @@ class VectorStorageManager {
                 .collection(Constants_1.Collections.FEEDBACK);
             const feedback = (yield collection
                 .find({ eventName: { $regex: new RegExp(eventName, "i") } })
-                .toArray()).map((event) => {
-                return {
-                    feedback: event.feedback,
-                };
-            });
-            if (!feedback) {
+                .toArray()).map((event) => event.feedback);
+            if (!feedback || feedback.length === 0) {
                 throw new Error(`There is no feedback for ${eventName} currently`);
             }
             return feedback;
@@ -177,11 +181,14 @@ class VectorStorageManager {
                 eventName,
                 shiftLetter,
             });
-            return result.acknowledged;
+            return result.acknowledged ? `${fullName} has signed up for ${eventName} on SHIFT ${shiftLetter}` : `Something went wrong while signing up ${fullName} for ${eventName} on SHIFT ${shiftLetter}.\nPlease contact the director for this event.`;
         });
     }
-    cancelShift(fullName, eventName, shiftLetter) {
+    cancelShift(fullName, eventName, shiftLetter, secretCode) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (secretCode !== process.env.SECRET_CODE) {
+                return "You do not have the permissions to perform this action.";
+            }
             const collection = this.client
                 .db(process.env.MONGO_DB_NAME)
                 .collection(Constants_1.Collections.SHIFTS);
@@ -195,7 +202,7 @@ class VectorStorageManager {
                 throw new Error(`No matching shift found to cancel for ${fullName}.`);
             }
             const result = yield collection.findOneAndDelete(query);
-            return result !== null;
+            return `SHIFT ${shiftLetter} for ${fullName} was ${result !== null ? "successfully" : "NOT able to be"} canceled for the ${eventName}`;
         });
     }
     eventShifts(eventName) {

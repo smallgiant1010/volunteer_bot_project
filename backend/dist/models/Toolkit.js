@@ -34,7 +34,7 @@ class Toolkit {
     }
     retrieverToolCreation() {
         const retriever = this.vector_store_manager.getVectorStore().asRetriever({
-            k: 5,
+            k: 2,
         });
         const retrieverTool = (0, retriever_1.createRetrieverTool)(retriever, {
             name: "events_retriever",
@@ -47,19 +47,21 @@ class Toolkit {
             eventName: zod_1.default.string().describe("The name of the new event"),
             eventDescription: zod_1.default.string().describe("The description of the event and what it is about"),
             eventDate: zod_1.default.string().describe("The date of the event"),
+            secretCode: zod_1.default.string().describe("The secret code provided by the user."),
         });
         const tool = new tools_1.DynamicStructuredTool({
             name: "store_event",
             description: "Use this tool to store a new upcoming event",
             schema,
-            func: (_a) => __awaiter(this, [_a], void 0, function* ({ eventName, eventDescription, eventDate }) {
+            func: (_a) => __awaiter(this, [_a], void 0, function* ({ eventName, eventDescription, eventDate, secretCode }) {
                 try {
                     const cleanedQuery = eventName.trim().toLowerCase();
-                    yield this.vector_store_manager.addEvent(eventDescription, cleanedQuery, eventDate);
+                    const sanitizedCode = secretCode.trim();
+                    yield this.vector_store_manager.addEvent(eventDescription, cleanedQuery, eventDate, sanitizedCode);
                     return `${eventName} Successfully Added to the Database`;
                 }
                 catch (error) {
-                    return `I could not add event and ran into this error: ${error}`;
+                    return error;
                 }
             }),
             returnDirect: true,
@@ -69,22 +71,20 @@ class Toolkit {
     removingEventsToolCreation() {
         const schema = zod_1.default.object({
             eventName: zod_1.default.string().describe("Just the name of the event"),
+            secretCode: zod_1.default.string().describe("The secret code provided by the user."),
         });
         const tool = new tools_1.DynamicStructuredTool({
             name: "event_cleanup",
-            description: "Use this tool to cancel an event.",
+            description: "Use this tool to cancel or remove an event.",
             schema,
-            func: (_a) => __awaiter(this, [_a], void 0, function* ({ eventName }) {
+            func: (_a) => __awaiter(this, [_a], void 0, function* ({ eventName, secretCode }) {
                 try {
                     const cleanedQuery = eventName.trim().toLowerCase();
-                    const result = yield this.vector_store_manager.cleanupEvent(cleanedQuery);
-                    if (!result) {
-                        return `${eventName} was not found or has already been removed.`;
-                    }
-                    return `${eventName} has been successfully removed from the database`;
+                    const result = yield this.vector_store_manager.cleanupEvent(cleanedQuery, secretCode);
+                    return result;
                 }
                 catch (error) {
-                    return `I ran into this error while trying to remove the event: ${error}`;
+                    return error;
                 }
             }),
             returnDirect: true,
@@ -98,19 +98,16 @@ class Toolkit {
         });
         const tool = new tools_1.DynamicStructuredTool({
             name: "feedback_storing_tool",
-            description: "Use this tool if the user leaves an opinion about a certain event so you can store the feedback",
+            description: "Use this tool if the user leaves an opinion about a certain event so you can store the feedback.",
             schema,
             func: (_a) => __awaiter(this, [_a], void 0, function* ({ eventName, feedback }) {
                 try {
                     const cleanedEventName = eventName.trim().toLowerCase();
                     const result = yield this.vector_store_manager.storeFeedback(feedback, cleanedEventName);
-                    if (!result) {
-                        return `Feedback for ${eventName} was NOT stored successfully.`;
-                    }
-                    return `Feedback for ${eventName} was stored successfully`;
+                    return result;
                 }
                 catch (error) {
-                    return `I received this error while attempting to store the feedback ${error}`;
+                    return error;
                 }
             }),
             returnDirect: true,
@@ -123,20 +120,16 @@ class Toolkit {
         });
         const tool = new tools_1.DynamicStructuredTool({
             name: "feedback_retriever",
-            description: "This tool is not for storing feedback. Use this tool in order to retrieve the feedback regarding an event.",
+            description: "This tool is not for storing feedback. Use this tool in order to retrieve the feedback already stored regarding an event.",
             schema,
             func: (_a) => __awaiter(this, [_a], void 0, function* ({ eventName }) {
                 try {
                     const cleanedQuery = eventName.trim().toLowerCase();
                     const feedbacks = yield this.vector_store_manager.getFeedback(cleanedQuery);
-                    if (!feedbacks || feedbacks.length === 0) {
-                        return `No feedback found for ${eventName}.`;
-                    }
-                    const stringsOfFeedback = feedbacks === null || feedbacks === void 0 ? void 0 : feedbacks.map(feedback => feedback.feedback);
-                    return stringsOfFeedback.join("\n");
+                    return feedbacks.join("\n") || `There were no feedbacks for ${eventName}.`;
                 }
                 catch (error) {
-                    return `I received this error while attempting to retrieve feedback about ${eventName}: ${error}`;
+                    return error;
                 }
             }),
             returnDirect: true,
@@ -157,10 +150,7 @@ class Toolkit {
                 try {
                     const cleanedQuery = eventName.trim().toLowerCase();
                     const result = yield this.vector_store_manager.addShift(fullName, cleanedQuery, shiftLetter);
-                    if (!result) {
-                        return `Something went wrong while signing up. Please contact the director for this event.`;
-                    }
-                    return `${fullName} has signed up for ${eventName} on SHIFT ${shiftLetter}`;
+                    return result;
                 }
                 catch (error) {
                     return `I received this error while trying to enroll ${fullName} on Shift ${shiftLetter} for ${eventName}: ${error}`;
@@ -175,19 +165,20 @@ class Toolkit {
             fullName: zod_1.default.string().describe("The full name of the individual trying to sign up for a shift"),
             eventName: zod_1.default.string().describe("Just the name of the event"),
             shiftLetter: zod_1.default.string().regex(/^[A-Z]$/i).describe("A single letter that represents the shift that the user is trying to sign up for"),
+            secretCode: zod_1.default.string().describe("The secret code provided by the user."),
         });
         const tool = new tools_1.DynamicStructuredTool({
             name: "cancel_shift",
             description: "Use this tool if the user is trying to cancel a shift for an event",
             schema,
-            func: (_a) => __awaiter(this, [_a], void 0, function* ({ fullName, eventName, shiftLetter }) {
+            func: (_a) => __awaiter(this, [_a], void 0, function* ({ fullName, eventName, shiftLetter, secretCode }) {
                 try {
                     const cleanedQuery = eventName.trim().toLowerCase();
-                    const result = yield this.vector_store_manager.cancelShift(fullName, cleanedQuery, shiftLetter);
-                    return `${fullName} is no longer on SHIFT ${shiftLetter} for ${eventName}`;
+                    const result = yield this.vector_store_manager.cancelShift(fullName, cleanedQuery, shiftLetter, secretCode);
+                    return result;
                 }
                 catch (error) {
-                    return `I received this error while trying to cancel ${fullName} on Shift ${shiftLetter} for ${eventName}: ${error}`;
+                    return error;
                 }
             }),
             returnDirect: true,
@@ -199,7 +190,7 @@ class Toolkit {
             eventName: zod_1.default.string().describe("Just the name of the event"),
         });
         const tool = new tools_1.DynamicStructuredTool({
-            name: "get_shifts_for_event",
+            name: "get_volunteers_for_events",
             description: "Use this tool to retrieve all volunteers that have shifts for a specific event",
             schema,
             func: (_a) => __awaiter(this, [_a], void 0, function* ({ eventName }) {
@@ -210,7 +201,7 @@ class Toolkit {
                         return `No volunteers have signed up for ${eventName} yet.`;
                     }
                     const listOfShifts = shifts.map(shift => `${shift.name} has signed up for SHIFT ${shift.shiftLetter}`);
-                    return listOfShifts.join("\n");
+                    return listOfShifts.join("\n") || `I couldn't find any shifts for ${eventName}.`;
                 }
                 catch (error) {
                     return `I received this error while trying to retrieve the shifts for ${eventName}: ${error}`;

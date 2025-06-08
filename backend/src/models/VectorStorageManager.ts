@@ -1,8 +1,10 @@
-import { OllamaEmbeddings } from "@langchain/ollama";
+// import { OllamaEmbeddings } from "@langchain/ollama";
+// import { MistralAIEmbeddings } from "@langchain/mistralai"
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 import { MongoClient } from "mongodb";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { LLMS, Collections } from "../constants/Constants";
+import { LLMS, Collections, Indexes } from "../constants/Constants";
 import * as dotenv from "dotenv";
 import type { Document } from "@langchain/core/documents";
 import { v6 as uuidv6 } from "uuid";
@@ -11,13 +13,13 @@ dotenv.config();
 
 export class VectorStorageManager {
   private events_vector_store!: MongoDBAtlasVectorSearch;
-  private indexName: string = "volunteerBot";
+  private indexName: string = Indexes.DEV_INDEX;
   private client!: MongoClient;
-  private model: OllamaEmbeddings;
+  private model: GoogleGenerativeAIEmbeddings;
 
   constructor() {
-    this.model = new OllamaEmbeddings({
-      model: LLMS.EMBEDDING_MODEL as string,
+    this.model = new GoogleGenerativeAIEmbeddings({
+      model: LLMS.DEV_EMBEDDING_MODEL as string,
     });
 
     this.client = new MongoClient(process.env.MONGO_URI || "");
@@ -36,10 +38,14 @@ export class VectorStorageManager {
   async addEvent(
     eventDescription: string,
     eventName: string,
-    eventDate: string
+    eventDate: string,
+    secretCode: string,
   ) {
+    if(secretCode !== process.env.SECRET_CODE) {
+      return "You do not have the permissions to perform this action.";
+    }
     const existing = await this.events_vector_store.similaritySearch(
-      eventName,
+      eventDescription,
       1,
       {
         preFilter: {
@@ -76,9 +82,13 @@ export class VectorStorageManager {
     }
 
     await this.events_vector_store.addDocuments(docs, { ids });
+    return `${eventName} was successfully registered into the database.`;
   }
 
-  async cleanupEvent(eventName: string): Promise<boolean> {
+  async cleanupEvent(eventName: string, secretCode: string) {
+    if(secretCode !== process.env.SECRET_CODE) {
+      return "You do not have the permissions to perform this action.";
+    }
     const regex = new RegExp(eventName, "i");
     const eventsCollection = this.client
       .db(process.env.MONGO_DB_NAME)
@@ -89,8 +99,7 @@ export class VectorStorageManager {
     });
 
     if (existingEventCount === 0) {
-      console.warn(`No events found for "${eventName}". Cleanup skipped.`);
-      return false;
+      throw new Error(`No events found for "${eventName}". Cleanup skipped.`);
     }
 
     const eventDocs = await eventsCollection
@@ -110,10 +119,10 @@ export class VectorStorageManager {
       .collection(Collections.SHIFTS)
       .deleteMany({ eventName: { $regex: regex } });
 
-    return deleteResultFeedback.acknowledged && deleteResultShifts.acknowledged;
+    return `${eventName} successfully removed from database, further more: \n${deleteResultFeedback.acknowledged ? `Feedback related to ${eventName} was removed as well.`: `Feedback for ${eventName} could not be removed`}\n${deleteResultShifts.acknowledged ? `Shifts related to ${eventName} were also removed.` : `The Shifts for this event could not be removed`}`;
   }
 
-  async storeFeedback(feedback: string, eventName: string): Promise<boolean> {
+  async storeFeedback(feedback: string, eventName: string) {
     const collection = this.client
       .db(process.env.MONGO_DB_NAME)
       .collection(Collections.FEEDBACK);
@@ -123,7 +132,7 @@ export class VectorStorageManager {
       eventName,
     });
 
-    return result.acknowledged;
+    return result.acknowledged ? `Feedback for ${eventName} was accepted` : `Feedback for ${eventName} could not be stored`;
   }
 
   async getFeedback(eventName: string) {
@@ -135,13 +144,9 @@ export class VectorStorageManager {
       await collection
         .find({ eventName: { $regex: new RegExp(eventName, "i") } })
         .toArray()
-    ).map((event) => {
-      return {
-        feedback: event.feedback as string,
-      };
-    });
+    ).map((event) => event.feedback as string);
 
-    if (!feedback) {
+    if (!feedback || feedback.length === 0) {
       throw new Error(`There is no feedback for ${eventName} currently`);
     }
 
@@ -152,7 +157,7 @@ export class VectorStorageManager {
     fullName: string,
     eventName: string,
     shiftLetter: string
-  ): Promise<boolean> {
+  ) {
     const collection = this.client
       .db(process.env.MONGO_DB_NAME)
       .collection(Collections.SHIFTS);
@@ -173,14 +178,19 @@ export class VectorStorageManager {
       shiftLetter,
     });
 
-    return result.acknowledged;
+    return result.acknowledged ? `${fullName} has signed up for ${eventName} on SHIFT ${shiftLetter}` : `Something went wrong while signing up ${fullName} for ${eventName} on SHIFT ${shiftLetter}.\nPlease contact the director for this event.`;
   }
 
   async cancelShift(
     fullName: string,
     eventName: string,
-    shiftLetter: string
-  ): Promise<boolean> {
+    shiftLetter: string,
+    secretCode: string,
+  ) {
+    if(secretCode !== process.env.SECRET_CODE) {
+      return "You do not have the permissions to perform this action.";
+    }
+
     const collection = this.client
       .db(process.env.MONGO_DB_NAME)
       .collection(Collections.SHIFTS);
@@ -199,7 +209,7 @@ export class VectorStorageManager {
 
     const result = await collection.findOneAndDelete(query);
 
-    return result !== null; 
+    return `SHIFT ${shiftLetter} for ${fullName} was ${result !== null ? "successfully" : "NOT able to be"} canceled for the ${eventName}`; 
   }
 
   async eventShifts(eventName: string): Promise<

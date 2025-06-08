@@ -1,4 +1,6 @@
-import { ChatOllama } from "@langchain/ollama";
+// import { ChatOllama } from "@langchain/ollama";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+// import { ChatMistralAI } from "@langchain/mistralai";
 import * as dotenv from "dotenv";
 import { Instruction, LLMS } from "../constants/Constants";
 import { ChatPromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate } from "@langchain/core/prompts";
@@ -54,12 +56,13 @@ export class ChatBot {
         return bot;
     }
 
-    private createLLM(is_being_tested: boolean): ChatOllama {
-        return new ChatOllama({
-            model: LLMS.CHAT_MODEL as string,
+    private createLLM(is_being_tested: boolean): ChatGoogleGenerativeAI {
+        return new ChatGoogleGenerativeAI({
+            model: LLMS.DEV_CHAT_MODEL as string,
             // baseUrl: "",
             temperature: 0.3,
-            verbose: is_being_tested
+            verbose: is_being_tested,
+            maxRetries: 2
         });
     }
 

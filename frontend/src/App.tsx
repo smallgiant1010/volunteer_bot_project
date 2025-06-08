@@ -2,7 +2,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { Button, Form, Image, InputGroup, Stack } from "react-bootstrap";
 import Robot from "./robot.png";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Spinner from 'react-bootstrap/Spinner';
 
 type MessageType = {
@@ -55,7 +55,7 @@ function App() {
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
 
-  const handleClick = async(e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClick = async(e: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     e.preventDefault();
     setIsLoading(_ => true);
     setMessages(prev => [...prev, {
@@ -113,6 +113,11 @@ function App() {
               aria-label="Message"
               aria-describedby="basic-addon2"
               ref={inputRef}
+              onKeyDown={async (e) => {
+                if(e.key === 'Enter') {
+                  await handleClick(e);
+                }
+              }}
             />
             <Button id="button-addon2" className="border border-0" onClick={handleClick}>
               {isLoading ? <Spinner animation="border" size="sm"/> : "Send"}

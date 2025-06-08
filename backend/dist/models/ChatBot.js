@@ -43,7 +43,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatBot = void 0;
-const ollama_1 = require("@langchain/ollama");
+// import { ChatOllama } from "@langchain/ollama";
+const google_genai_1 = require("@langchain/google-genai");
+// import { ChatMistralAI } from "@langchain/mistralai";
 const dotenv = __importStar(require("dotenv"));
 const Constants_1 = require("../constants/Constants");
 const prompts_1 = require("@langchain/core/prompts");
@@ -87,11 +89,12 @@ class ChatBot {
         });
     }
     createLLM(is_being_tested) {
-        return new ollama_1.ChatOllama({
-            model: Constants_1.LLMS.CHAT_MODEL,
+        return new google_genai_1.ChatGoogleGenerativeAI({
+            model: Constants_1.LLMS.DEV_CHAT_MODEL,
             // baseUrl: "",
             temperature: 0.3,
-            verbose: is_being_tested
+            verbose: is_being_tested,
+            maxRetries: 2
         });
     }
     sendMessage(message) {
